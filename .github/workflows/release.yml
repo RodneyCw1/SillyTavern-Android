@@ -1,0 +1,88 @@
+name: Publish signed APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-release
+  queue: max
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.repository == 'RodneyCw1/SillyTavern-Android' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    environment: release-signing
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22.23.2'
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            .local/android-sdk
+            .local/gradle-8.13
+            .local/gradle-cache
+            .local/downloads
+            .local/npm-cache
+          key: android-windows-node22-ndk28-${{ hashFiles('docs/runtime-bundle.json', 'package-lock.json', 'server/package-lock.json') }}
+      - name: Allocate version
+        run: node scripts/release.mjs version
+      - name: Setup pinned tools and dependencies
+        shell: pwsh
+        run: ./scripts/setup-sdk.ps1
+      - name: Audit public source and test core
+        shell: pwsh
+        run: |
+          node scripts/check-public-source.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Source audit failed' }
+          npm test
+          if ($LASTEXITCODE -ne 0) { throw 'Node tests failed' }
+      - name: Install pinned native runtime
+        shell: pwsh
+        run: ./scripts/fetch-runtime.ps1
+      - name: Package runtime and test Android
+        shell: pwsh
+        run: |
+          node scripts/prepare-runtime.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime packaging failed' }
+          . ./scripts/environment.ps1
+          & .local/gradle-8.13/bin/gradle.bat -p android testDebugUnitTest lintDebug --no-daemon --console=plain
+          if ($LASTEXITCODE -ne 0) { throw 'Android checks failed' }
+      - name: Sign with original certificate
+        shell: pwsh
+        env:
+          ST_ANDROID_KEYSTORE_B64: ${{ secrets.ST_ANDROID_KEYSTORE_B64 }}
+          ST_ANDROID_STORE_PASSWORD: ${{ secrets.ST_ANDROID_STORE_PASSWORD }}
+          ST_ANDROID_KEY_PASSWORD: ${{ secrets.ST_ANDROID_KEY_PASSWORD }}
+        run: |
+          if (-not $env:ST_ANDROID_KEYSTORE_B64 -or -not $env:ST_ANDROID_STORE_PASSWORD -or -not $env:ST_ANDROID_KEY_PASSWORD) { throw 'Original release signing secrets are required' }
+          $keyFile = Join-Path $env:RUNNER_TEMP ('st-signing-' + [guid]::NewGuid().ToString() + '.p12')
+          try {
+            [IO.File]::WriteAllBytes($keyFile, [Convert]::FromBase64String($env:ST_ANDROID_KEYSTORE_B64))
+            $env:ST_ANDROID_KEYSTORE = $keyFile
+            ./scripts/build.ps1 -Variant Release -SkipAssets
+          } finally {
+            if (Test-Path -LiteralPath $keyFile) { Remove-Item -LiteralPath $keyFile -Force }
+            Remove-Item Env:ST_ANDROID_KEYSTORE_B64,Env:ST_ANDROID_STORE_PASSWORD,Env:ST_ANDROID_KEY_PASSWORD -ErrorAction SilentlyContinue
+          }
+      - name: Audit signed APK
+        shell: pwsh
+        run: |
+          node scripts/audit-apk-assets.mjs "releases/SillyTavern-Android-$env:ST_ANDROID_VERSION_NAME-release.apk" releases/apk-audit.json
+          if ($LASTEXITCODE -ne 0) { throw 'APK audit failed' }
+      - name: Publish complete Release and version Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release.mjs publish
