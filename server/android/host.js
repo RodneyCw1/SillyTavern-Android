@@ -34,7 +34,7 @@ export async function installAndroidNative(app) {
     await jobs.initialize();
     const router = express.Router();
     router.use((req, res, next) => tokenMatches(req.headers['x-android-host']) ? next() : res.sendStatus(403));
-    router.get('/status', (_req, res) => res.json({ ready: !migrating && !restartRequired, migrating, restartRequired, active: jobs.activeCount(), memory: { ...process.memoryUsage(), cachedJobs: jobs.jobs.size, pendingWrites: jobs.writes.size, workers: jobs.workers.size }, results: [...jobs.recent.values()] }));
+    router.get('/status', (_req, res) => res.json({ ready: !migrating && !restartRequired, migrating, restartRequired, active: jobs.activeCount(), pendingSaves: writes, memory: { ...process.memoryUsage(), cachedJobs: jobs.jobs.size, pendingWrites: jobs.writes.size, workers: jobs.workers.size }, results: [...jobs.recent.values()] }));
     router.post('/import', async (req, res) => {
         const id = req.body?.id;
         if (typeof id !== 'string' || !/^[a-f0-9]{32}$/.test(id)) return res.status(400).json({ error: 'Invalid import operation ID' });

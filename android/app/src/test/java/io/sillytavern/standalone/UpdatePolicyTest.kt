@@ -9,6 +9,14 @@ class UpdatePolicyTest {
         "https://github.com/RodneyCw1/SillyTavern-Android/releases/download/v1.1.5%2Bbuild.1/app.apk",
         3, "0".repeat(64), UpdatePolicy.CERTIFICATE, "a".repeat(40), "Test")
     @Test fun acceptsOriginalSigningAndSupportedSdk() { UpdatePolicy.validate(valid(), 29); UpdatePolicy.requireUpgrade(valid(), 7) }
+    @Test fun refusesInstallationWhileBackendIsBusyEvenAfterPageReload() {
+        UpdatePolicy.requireIdle(true, false, 0, 0, 0)
+        for (state in listOf(listOf(1,0,0), listOf(0,1,0), listOf(0,0,1), listOf(-1,0,0))) {
+            assertThrows(IllegalArgumentException::class.java) { UpdatePolicy.requireIdle(true,false,state[0],state[1],state[2]) }
+        }
+        assertThrows(IllegalArgumentException::class.java) { UpdatePolicy.requireIdle(false,false,0,0,0) }
+        assertThrows(IllegalArgumentException::class.java) { UpdatePolicy.requireIdle(true,true,0,0,0) }
+    }
     @Test fun refusesEqualAndOlderVersions() {
         for (code in listOf(1001L, 1002L)) assertThrows(IllegalArgumentException::class.java) { UpdatePolicy.requireUpgrade(valid(), code) }
     }

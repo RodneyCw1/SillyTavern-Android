@@ -64,3 +64,5 @@ docs/node-source.json 固定源码、SHA-256、NDK、API 和内存页大小。sc
     node scripts/check-public-source.mjs
 
 签名构建和资源审计的详细结果随 Release 发布。更新清单协议为 schemaVersion 1，包含 versionName、versionCode、packageName、minSdk、apkUrl、size、sha256、signingSha256、commit、sourceHash、notes。客户端固定仓库地址、包名及原证书，拒绝旧版、损坏 APK 和错误签名。
+
+完整 Linux 命令和暂存目录说明见 [docs/LINUX-RUNTIME.md](docs/LINUX-RUNTIME.md)。

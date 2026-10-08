@@ -29,6 +29,11 @@ object UpdatePolicy {
             && uri.path.startsWith("/RodneyCw1/SillyTavern-Android/releases/download/")
             && uri.path.endsWith(".apk") && uri.path.split('/').none { it == "." || it == ".." }) { "更新下载地址无效" }
     }
+    fun requireIdle(ready: Boolean, importing: Boolean, activeJobs: Int, pendingSaves: Int, pendingJobWrites: Int) {
+        require(ready && !importing && activeJobs == 0 && pendingSaves == 0 && pendingJobWrites == 0) {
+            "后台聊天、保存或导入尚未结束，请稍后安装更新"
+        }
+    }
     fun requireUpgrade(info: UpdateInfo, installedCode: Long) {
         require(info.versionCode > installedCode) { "该版本不是更新版本" }
     }

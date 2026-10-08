@@ -252,6 +252,24 @@ class MainActivity : ComponentActivity() {
         )
         if (!accepted) status.text = "导入进行中，请等待完成后重启。"
     }
+    private fun checkUpdateRuntime(nonce: String, beforeSave: Boolean = false, ready: () -> Unit) {
+        io.execute {
+            val result = runCatching {
+                val state = nativeRequest("/status")
+                UpdatePolicy.requireIdle(state.optBoolean("ready"), state.optBoolean("migrating"),
+                    state.optInt("active", -1), if (beforeSave) 0 else state.optInt("pendingSaves", -1),
+                    if (beforeSave) 0 else state.optJSONObject("memory")?.optInt("pendingWrites", -1) ?: -1)
+            }
+            handler.post {
+                if (closing.get() || updateNonce != nonce) return@post
+                if (importing || rendererGone || !webViewReady || result.isFailure) {
+                    updateInstall = null; updateNonce = null
+                    status.visibility = View.VISIBLE
+                    status.text = result.exceptionOrNull()?.message ?: "页面或导入状态已变化，已取消安装更新。"
+                } else ready()
+            }
+        }
+    }
     private fun prepareUpdateInstall(install: () -> Unit) {
         if (importing || updateInstall != null || !loaded || rendererGone || !webViewReady) {
             AlertDialog.Builder(this).setTitle("暂时无法安装").setMessage("请等待页面、聊天及数据导入完成后再安装更新。").setPositiveButton("确定", null).show()
@@ -266,10 +284,12 @@ class MainActivity : ComponentActivity() {
                 status.text = "保存确认超时，已取消安装；请稍后重试。"
             }
         }, 30000)
-        web.evaluateJavascript("window.STAndroid?.prepareUpdateInstall(" + JSONObject.quote(nonce) + ") || false") { accepted ->
-            if (accepted != "true" && updateNonce == nonce) {
-                updateInstall = null; updateNonce = null
-                status.text = "页面未能确认保存，已取消安装更新。"
+        checkUpdateRuntime(nonce, beforeSave = true) {
+            web.evaluateJavascript("window.STAndroid?.prepareUpdateInstall(" + JSONObject.quote(nonce) + ") || false") { accepted ->
+                if (accepted != "true" && updateNonce == nonce) {
+                    updateInstall = null; updateNonce = null
+                    status.text = "页面未能确认保存，已取消安装更新。"
+                }
             }
         }
     }
@@ -294,9 +314,12 @@ class MainActivity : ComponentActivity() {
             "runtime.update-ready" -> {
                 check(!importing && !rendererGone && webViewReady) { "页面或导入状态已变化，请稍后重试" }
                 check(updateNonce != null && input.optJSONObject("data")?.optString("nonce") == updateNonce) { "无有效的安装请求" }
-                val install = updateInstall ?: error("安装请求已取消")
-                updateInstall = null; updateNonce = null
-                handler.post { status.visibility = View.GONE; install() }
+                val nonce = updateNonce ?: error("安装请求已取消")
+                checkUpdateRuntime(nonce) {
+                    val install = updateInstall ?: return@checkUpdateRuntime
+                    updateInstall = null; updateNonce = null
+                    status.visibility = View.GONE; install()
+                }
                 return true
             }
             "runtime.restart" -> { handler.post { restart() }; return true }

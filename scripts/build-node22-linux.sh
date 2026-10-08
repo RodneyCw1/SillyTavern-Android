@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 project="$(cd "$(dirname "$0")/.." && pwd)"
-build=/opt/st-android-build
+build="${ST_NODE_BUILD_ROOT:-$project/.local/node-build}"
 version=22.23.2
 archive="node-v$version.tar.xz"
 sha=bbe768df8d5815d7fa76124052985332452e0a4742d39f32027550d1aab8f6fb
@@ -24,7 +24,11 @@ if [ ! -f "$source/configure" ]; then
 fi
 cd "$source"
 python3 "$project/scripts/patch-node22.py"
-ndk="$build/android-ndk-r28c"
+ndk="${ST_ANDROID_NDK:-${ANDROID_NDK_HOME:-$build/android-ndk-r28c}}"
+if ! grep -q 'Pkg.Revision = 28.2.13676358' "$ndk/source.properties"; then
+  echo 'Android NDK 28.2.13676358 is required. Set ST_ANDROID_NDK to that NDK directory.' >&2
+  exit 1
+fi
 toolchain="$ndk/toolchains/llvm/prebuilt/linux-x86_64"
 export PATH="$toolchain/bin:$PATH"
 export CC="$toolchain/bin/${triple}29-clang"
@@ -42,3 +46,7 @@ mkdir -p "$project/.local/runtime22/$abi"
 "$toolchain/bin/llvm-readelf" -lW "$output" > "$project/.local/runtime22/$abi/elf-program-headers.txt"
 "$toolchain/bin/llvm-readelf" -dW "$output" > "$project/.local/runtime22/$abi/elf-dynamic.txt"
 sha256sum "$project/.local/runtime22/$abi/libnode.so"
+# Node's install target stages public headers without writing to the host /usr.
+make install DESTDIR="$build/installed-$arch" >> "$build/build-node22-$arch.log" 2>&1
+cp "$build/build-node22-$arch.log" "$project/.local/runtime22/$abi/build.log"
+node "$project/scripts/stage-node-runtime.mjs" "$build/installed-$arch/usr/local/include/node" "$source/LICENSE"
