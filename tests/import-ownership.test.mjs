@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import crypto from 'node:crypto';
+import { once } from 'node:events';
+import { createRequire } from 'node:module';
+const require = createRequire(new URL('../server/package.json', import.meta.url));
+const express = require('express');
+
+test('R11 rejected imports consume only their operation file and preserve user data', async t => {
+    const base = path.resolve('.local/tests'); await fs.mkdir(base, { recursive: true });
+    const home = await fs.mkdtemp(path.join(base, 'import-owner-'));
+    t.after(() => fs.rm(home, { recursive: true, force: true }));
+    const token = 'a'.repeat(64);
+    process.env.ST_ANDROID = '1'; process.env.ST_ANDROID_HOME = home; process.env.ST_ANDROID_TOKEN = token;
+    globalThis.DATA_ROOT = path.join(home, 'data');
+    await fs.mkdir(path.join(home, 'imports')); await fs.mkdir(globalThis.DATA_ROOT);
+    await fs.writeFile(path.join(globalThis.DATA_ROOT, 'keep'), 'untouched');
+    const { installAndroidNative, androidAuth } = await import('../server/android/host.js');
+    const app = express(); app.use(express.json()); app.use(androidAuth); await installAndroidNative(app);
+    const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
+    t.after(() => { server.closeAllConnections(); server.close(); });
+    const url = `http://127.0.0.1:${server.address().port}/api/android/native/import`;
+    const post = body => fetch(url, { method: 'POST', headers: { 'x-android-host': token, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const id = crypto.randomUUID().replaceAll('-', ''), other = crypto.randomUUID().replaceAll('-', '');
+    const input = path.join(home, 'imports', id + '.zip');
+    await fs.writeFile(input, 'invalid archive'); await fs.writeFile(path.join(home, 'imports', other + '.zip'), 'other operation');
+    assert.equal((await post({ id })).status, 400);
+    await assert.rejects(fs.stat(input), { code: 'ENOENT' });
+    assert.equal(await fs.readFile(path.join(home, 'imports', other + '.zip'), 'utf8'), 'other operation');
+    assert.equal((await post({ id: '../data/keep' })).status, 400);
+    assert.equal(await fs.readFile(path.join(globalThis.DATA_ROOT, 'keep'), 'utf8'), 'untouched');
+});

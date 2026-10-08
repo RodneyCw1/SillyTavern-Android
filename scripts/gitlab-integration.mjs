@@ -1,0 +1,43 @@
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { once } from 'node:events';
+import { createAndroidExtensionRouter } from '../server/android/extensions.js';
+const root=path.resolve(import.meta.dirname,'..'),require=createRequire(path.join(root,'server/package.json'));
+const express=require('express'),git=require('isomorphic-git');
+const inputUrl='https://gitlab.com/novi028/JS-Slash-Runner',canonicalUrl=inputUrl+'.git';
+await fsp.mkdir(path.join(root,'.local/tests'),{recursive:true});
+const folder=await fsp.mkdtemp(path.join(root,'.local/tests/gitlab-'));
+const local=path.join(folder,'local'),global=path.join(folder,'global');
+await fsp.mkdir(local);await fsp.mkdir(global);
+const app=express();app.use(express.json());app.use((req,res,next)=>{req.user={profile:{admin:true,handle:'fixture'},directories:{extensions:local}};next();});
+app.use('/api/extensions',createAndroidExtensionRouter(global));
+const server=app.listen(0,'127.0.0.1');await once(server,'listening');
+const report={testedAt:new Date().toISOString(),appVersion:'1.1.1',node:process.version,inputUrl,checks:[]};
+const call=(endpoint,body)=>fetch('http://127.0.0.1:'+server.address().port+'/api/extensions/'+endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(180000)});
+async function json(endpoint,body){const response=await call(endpoint,body);assert.equal(response.status,200,await response.clone().text());return response.json();}
+try{
+ const installed=await json('install',{url:inputUrl});delete installed.extensionPath;report.installed=installed;
+ const dir=path.join(local,'JS-Slash-Runner'),options={extensionName:'third-party/JS-Slash-Runner',global:false};
+ assert.equal(await git.getConfig({fs,dir,path:'remote.origin.url'}),canonicalUrl);
+ report.checks.push('The exact URL supplied by the user installs through the original HTTP API and stores a .git origin');
+ await git.setConfig({fs,dir,path:'remote.origin.url',value:inputUrl});
+ const before=await json('version',options);assert.equal(before.isUpToDate,true);
+ report.commit=before.currentCommitHash;report.checks.push('Version check accepts a legacy origin saved without .git');
+ const branches=await json('branches',options);assert.ok(branches.some(b=>b.name==='origin/main'));
+ report.checks.push('Branch listing accepts the legacy origin');
+ const bad=await call('switch',{...options,branch:'origin/does-not-exist-422-fixture'});assert.ok(bad.status>=400);
+ assert.equal(await git.resolveRef({fs,dir,ref:'HEAD'}),before.currentCommitHash);
+ report.checks.push('Failed branch switch leaves the installed commit intact');
+ const switched=await call('switch',{...options,branch:'origin/main'});assert.equal(switched.status,204,await switched.text());
+ assert.equal(await git.getConfig({fs,dir,path:'remote.origin.url'}),canonicalUrl);
+ report.checks.push('Successful branch switch upgrades the legacy origin to canonical form');
+ await git.setConfig({fs,dir,path:'remote.origin.url',value:inputUrl});
+ const updated=await json('update',options);assert.equal(updated.remoteUrl,canonicalUrl);
+ report.checks.push('Staged update accepts the legacy origin and persists the canonical origin');
+ assert.equal((await call('install',{url:inputUrl})).status,409);
+ report.checks.push('Installing again still protects the existing extension with HTTP 409');
+ await fsp.writeFile(path.join(root,'docs/gitlab-install-1.1.1.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+}finally{server.closeAllConnections();server.close();await fsp.rm(folder,{recursive:true,force:true});}

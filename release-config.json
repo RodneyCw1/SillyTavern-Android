@@ -1,0 +1,8 @@
+{
+  "baseVersion": "1.1.5",
+  "versionCodeOffset": 1000,
+  "repository": "RodneyCw1/SillyTavern-Android",
+  "packageName": "io.sillytavern.standalone",
+  "minSdk": 29,
+  "signingSha256": "c1b898bcbe03fc7991fe77a0fbe559f0da86667036850a917c2e45839070799f"
+}

@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
+import { pipeline } from 'node:stream/promises';
+const root=path.resolve(import.meta.dirname,'..');
+const archiver=createRequire(path.join(root,'server/package.json'))('archiver');
+const source=JSON.parse(await fsp.readFile(path.join(root,'docs/node-source.json'),'utf8'));
+const stage=path.resolve(process.argv[2] || path.join(root,'.local/runtime-bundle'));
+const fileName='node-'+source.version+'-android-16k.zip';
+const outDir=path.join(root,'.local/runtime-release');
+await fsp.mkdir(outDir,{recursive:true});
+const output=path.join(outDir,fileName);
+const archive=archiver('zip',{zlib:{level:6}});
+const done=pipeline(archive,fs.createWriteStream(output));done.catch(()=>{});
+archive.directory(stage,false);await archive.finalize();await done;
+const sha256=crypto.createHash('sha256');
+for await(const chunk of fs.createReadStream(output))sha256.update(chunk);
+const patchSha256=crypto.createHash('sha256').update(await fsp.readFile(path.join(root,'scripts/patch-node22.py'))).digest('hex');
+const metadata={schemaVersion:1,nodeVersion:source.version,sourceSha256:source.sourceSha256,ndk:source.ndk,api:source.api,pageSize:source.pageSize,patchSha256,fileName,sha256:sha256.digest('hex'),
+url:'https://github.com/RodneyCw1/SillyTavern-Android/releases/download/runtime-node-'+source.version+'-16k/'+fileName};
+await fsp.writeFile(path.join(root,'docs/runtime-bundle.json'),JSON.stringify(metadata,null,2)+'\n');
+console.log(JSON.stringify({output,...metadata}));

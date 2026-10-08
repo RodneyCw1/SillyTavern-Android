@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "nodeVersion": "22.23.2",
+  "sourceSha256": "bbe768df8d5815d7fa76124052985332452e0a4742d39f32027550d1aab8f6fb",
+  "ndk": "28.2.13676358",
+  "api": 29,
+  "pageSize": 16384,
+  "patchSha256": "49a247264b6c8494ffc2c620343f831a93b2d85009c70812d2db22fa67130e95",
+  "fileName": "node-22.23.2-android-16k.zip",
+  "sha256": "7b5f0a2c00d195b39143bc12aa91397b420c77a315515cfa7768dff0a4db03aa",
+  "url": "https://github.com/RodneyCw1/SillyTavern-Android/releases/download/runtime-node-22.23.2-16k/node-22.23.2-android-16k.zip"
+}
