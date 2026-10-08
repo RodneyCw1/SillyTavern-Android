@@ -162,7 +162,11 @@ class AppUpdater(private val activity: MainActivity, private val prepareInstall:
     private fun verifyApk(file: File, info: UpdateInfo) {
         UpdatePolicy.validate(info, Build.VERSION.SDK_INT); UpdatePolicy.requireUpgrade(info, installedCode)
         UpdatePolicy.verifyFile(file, info)
-        val archive = activity.packageManager.getPackageArchiveInfo(file.absolutePath, PackageManager.GET_SIGNING_CERTIFICATES)
+        // Android 10 collects archive certificates only when GET_SIGNATURES is also requested.
+        // Still compare the current apkContentsSigners, including on newer Android versions.
+        @Suppress("DEPRECATION")
+        val archiveFlags = PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES
+        val archive = activity.packageManager.getPackageArchiveInfo(file.absolutePath, archiveFlags)
             ?: error("更新文件不是有效 APK")
         require(archive.packageName == UpdatePolicy.PACKAGE && archive.longVersionCode == info.versionCode
             && archive.versionName == info.versionName && archive.applicationInfo!!.minSdkVersion == info.minSdk) { "APK 版本信息与更新清单不一致" }
