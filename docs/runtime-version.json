@@ -1,9 +1,0 @@
-{
-  "formatVersion": 1,
-  "appVersion": "1.1.5+build.1",
-  "versionCode": 1001,
-  "sillyTavern": "1.19.0",
-  "runtimeSha256": "dcb1389e14d82856303b80661aea4ca231922b60095fe70d077e71a5c65b6aff",
-  "sourceHash": "def3c22f276b7b2c973d2f73c75605724f238b4ddeed853739be7bf1ba44c89a",
-  "plugins": []
-}

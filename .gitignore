@@ -33,3 +33,4 @@ signing-password*.txt
 *.log
 .idea/
 .codegraph/
+docs/runtime-version.json
