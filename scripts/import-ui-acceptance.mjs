@@ -135,7 +135,7 @@ async function createDriver({ root, device, fixture, nonce, evidence, avd }) {
     };
     const tap = node => device.text('shell', 'input', 'tap', ...node.center.map(String));
     const waitNode = async (name, predicate) => until(async () => findUiNode(await dump(name), predicate), 20000);
-    const appVisible = async () => until(async () => (await dump('app')).some(n => n.package === device.packageName && n.text === '导入数据'), 20000);
+    const appVisible = async () => until(async () => (await dump('app')).some(n => n.package === device.packageName && n.text === '更新'), 20000);
     const readyPage = async () => {
         await until(() => device.nativeStatus().ready, 120000);
         browser?.disconnect();
@@ -169,7 +169,9 @@ async function createDriver({ root, device, fixture, nonce, evidence, avd }) {
             runAs(`rm -f files/tavern/imports/${calibration}.zip`);
         },
         async openPicker() {
-            tap(await waitNode('toolbar', n => n.package === device.packageName && n.text === '导入数据'));
+            const nodes = await dump('toolbar');
+            ensure(nodes.some(n => n.visible && n.package === device.packageName && n.text === '导入数据'), '导入入口暂时隐藏，系统选择器 UI 验收不适用于当前版本；迁移能力请使用底层回归测试验证。');
+            tap(findUiNode(nodes, n => n.package === device.packageName && n.text === '导入数据'));
             await until(async () => (await dump('picker')).some(n => /^(?:com\.android|com\.google\.android)\.documentsui$/.test(n.package)), 15000);
         },
         async cancelPicker() { device.text('shell', 'input', 'keyevent', 'KEYCODE_BACK'); await appVisible(); },
@@ -224,8 +226,14 @@ async function createDriver({ root, device, fixture, nonce, evidence, avd }) {
 
 async function main() {
     const root = path.resolve(import.meta.dirname, '..');
-    const { values } = parseArgs({ options: { serial: { type: 'string' }, package: { type: 'string' }, apk: { type: 'string' }, avd: { type: 'string' }, 'reset-test-data': { type: 'boolean', default: false } } });
+    const { values } = parseArgs({ options: { serial: { type: 'string' }, package: { type: 'string' }, apk: { type: 'string' }, avd: { type: 'string' }, 'reset-test-data': { type: 'boolean', default: false }, 'legacy-toolbar': { type: 'boolean', default: false } } });
     const report = { passed: false, checks: [], scope: 'Real system document picker on a dedicated debug emulator; synthetic data only; resets the selected debug package' };
+    if (!values['legacy-toolbar']) {
+        report.skipped = true;
+        report.reason = '导入工具栏入口暂时隐藏，当前版本不执行系统选择器 UI 验收；迁移能力由底层回归测试验证。回测旧工具栏须显式传入 --legacy-toolbar。';
+        console.log(JSON.stringify(report, null, 2));
+        return;
+    }
     let device, driver;
     try {
         device = createAndroidDevice({ root, serial: values.serial, packageName: values.package });

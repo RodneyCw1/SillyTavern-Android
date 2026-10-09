@@ -10,6 +10,8 @@
 
 在 Releases 下载签名 APK；Issues 中有每个版本的更新公告。旧 APK 首次手动覆盖安装，之后点击原生工具栏的“更新”，检查版本并在应用内下载，校验后由 Android 系统确认安装。未授权安装时按系统提示允许此应用安装更新。网络检查失败会明确报错，不会显示“已是最新”。
 
+原生工具栏仅显示“更新、重启、退出”，采用深色与浅金色按钮。“导入数据”和“恢复结果”的入口暂时隐藏，整包迁移、后台结果保存及恢复代码仍保留。日常聊天导入、导出请打开对应角色或群聊的“管理聊天文件”；导出的文件保存在 `Download/SillyTavern`。
+
 ## 另一台 Windows 电脑开发
 
 安装 Git、完整 JDK 21（Temurin 等）和 Node.js 22.23.2，然后：
@@ -62,6 +64,8 @@ docs/node-source.json 固定源码、SHA-256、NDK、API 和内存页大小。sc
 
     npm test
     node scripts/check-public-source.mjs
+
+导入入口隐藏期间，`scripts/import-ui-acceptance.mjs` 默认报告跳过，不会将系统选择器验收标记为通过，也不会重置设备数据；历史工具栏验收需显式传入 `--legacy-toolbar`。当前迁移和结果恢复能力继续由 Node 回归测试验证。
 
 签名构建和资源审计的详细结果随 Release 发布。更新清单协议为 schemaVersion 1，包含 versionName、versionCode、packageName、minSdk、apkUrl、size、sha256、signingSha256、commit、sourceHash、notes。客户端固定仓库地址、包名及原证书，拒绝旧版、损坏 APK 和错误签名。
 

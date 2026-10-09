@@ -28,6 +28,7 @@ README-MIGRATION.txt
 *.jks
 *.dpapi
 signing-password*.txt
+Google Cloud API Key.txt
 .env
 .env.*
 *.log

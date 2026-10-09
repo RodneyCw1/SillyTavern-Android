@@ -118,14 +118,14 @@
                             job.delivered = info.state === 'complete';
                             cleanup();
                             if (!job.delivered || ['plugin', 'quiet'].includes(job.context.type)) active.delete(job.id);
-                            if (info.state === 'interrupted' || info.state === 'cancelled' || info.state === 'failed' && info.status < 400) controller.error(new Error('生成已中断，已接收的内容保存在恢复结果中'));
+                            if (info.state === 'interrupted' || info.state === 'cancelled' || info.state === 'failed' && info.status < 400) controller.error(new Error('生成已中断，已接收的内容仍保存在后台'));
                             else controller.close();
                             return;
                         }
                     } catch (error) {
                         if (disposed) return;
                         if (signal?.aborted) { cleanup(); active.delete(job.id); controller.error(error); return; }
-                        if (++failures > 120) { cleanup(); active.delete(job.id); controller.error(new Error('连接中断；返回应用后可从“恢复结果”查看')); return; }
+                        if (++failures > 120) { cleanup(); active.delete(job.id); controller.error(new Error('连接中断；已接收的生成内容仍保存在后台')); return; }
                     }
                     await wait(Math.min(1000 * (failures + 1), 5000));
                     try { response = await originalFetch('/api/android/jobs/' + job.id + '/content?offset=' + offset, { signal }); }

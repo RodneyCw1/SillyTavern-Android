@@ -22,6 +22,7 @@ export function excludedSourcePath(relative) {
         || /^(?:server\/config\.yaml|android\/local\.properties|server\/android-lib\.js(?:\.license\.txt)?|android\/app\/src\/main\/assets\/runtime\.zip(?:\.pending)?)$/.test(normalized)
         || /\.(?:p12|pfx|jks|keystore|dpapi|log)$/i.test(name)
         || /^signing-password.*\.txt$/i.test(name)
+        || name === 'google cloud api key.txt'
         || name === '.env' || name.startsWith('.env.');
 }
 

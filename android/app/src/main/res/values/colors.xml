@@ -1,0 +1,9 @@
+<resources>
+    <color name="toolbar_accent">#CFB58B</color>
+    <color name="toolbar_on_accent">#181A20</color>
+    <color name="toolbar_surface">#242731</color>
+    <color name="toolbar_border">#454A55</color>
+    <color name="toolbar_text">#F0F1F5</color>
+    <color name="toolbar_ripple">#33FFFFFF</color>
+    <color name="toolbar_ripple_accent">#33181A20</color>
+</resources>

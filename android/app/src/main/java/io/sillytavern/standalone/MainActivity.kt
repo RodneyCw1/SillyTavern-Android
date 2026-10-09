@@ -3,7 +3,11 @@ package io.sillytavern.standalone
 import android.Manifest
 import android.app.AlertDialog
 import android.content.*
+import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.net.Uri
 import android.os.*
 import android.provider.MediaStore
@@ -58,15 +62,52 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(24, 26, 32)) }
-        val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        fun button(label: String, action: () -> Unit) {
-            toolbar.addView(Button(this).apply { text = label; textSize = 12f; setOnClickListener { action() } }, LinearLayout.LayoutParams(0, 44.dp(), 1f))
+        val toolbar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(12.dp(), 8.dp(), 12.dp(), 8.dp())
         }
-        button("导入数据") { migrationPicker.launch(arrayOf("application/zip", "application/octet-stream")) }
-        button("恢复结果") { if (rendererGone) recreate() else web.evaluateJavascript("window.STAndroid?.showRecovery()", null) }
-        button("更新") { updater.check() }
-        button("重启") { requestLifecycle("restart") }
-        button("退出") { requestLifecycle("exit") }
+        fun button(label: String, icon: Int, primary: Boolean = false, action: () -> Unit) {
+            val foreground = getColor(if (primary) R.color.toolbar_on_accent else R.color.toolbar_text)
+            val shape = GradientDrawable().apply {
+                cornerRadius = 10.dp().toFloat()
+                setColor(getColor(if (primary) R.color.toolbar_accent else R.color.toolbar_surface))
+                setStroke(1.dp(), getColor(if (primary) R.color.toolbar_accent else R.color.toolbar_border))
+            }
+            val view = Button(this).apply {
+                text = label
+                contentDescription = label
+                isAllCaps = false
+                setTextColor(foreground)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                textSize = 14f
+                setAutoSizeTextTypeUniformWithConfiguration(12, 14, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+                setSingleLine()
+                minWidth = 0; minimumWidth = 0
+                minHeight = 0; minimumHeight = 48.dp()
+                setPadding(12.dp(), 0, 12.dp(), 0)
+                compoundDrawablePadding = 6.dp()
+                setCompoundDrawablesRelativeWithIntrinsicBounds(getDrawable(icon)?.apply { setTint(foreground) }, null, null, null)
+                background = RippleDrawable(ColorStateList.valueOf(getColor(if (primary) R.color.toolbar_ripple_accent else R.color.toolbar_ripple)), shape, null)
+                elevation = 0f
+                stateListAnimator = null
+                setOnClickListener { action() }
+                addOnLayoutChangeListener { _, left, _, right, _, _, _, _, _ ->
+                    val iconWidth = compoundDrawablesRelative[0]?.bounds?.width() ?: 0
+                    val groupWidth = iconWidth + compoundDrawablePadding + paint.measureText(text.toString())
+                    val horizontalPadding = ((right - left - groupWidth) / 2).toInt().coerceAtLeast(8.dp())
+                    if (paddingLeft != horizontalPadding || paddingRight != horizontalPadding) {
+                        setPadding(horizontalPadding, 0, horizontalPadding, 0)
+                    }
+                }
+            }
+            toolbar.addView(view, LinearLayout.LayoutParams(0, 48.dp(), 1f).apply {
+                if (toolbar.childCount > 0) marginStart = 8.dp()
+            })
+        }
+        // Migration and recovery stay implemented while their toolbar entries are hidden.
+        button("更新", R.drawable.ic_toolbar_update, primary = true) { updater.check() }
+        button("重启", R.drawable.ic_toolbar_restart) { requestLifecycle("restart") }
+        button("退出", R.drawable.ic_toolbar_exit) { requestLifecycle("exit") }
         root.addView(toolbar)
         status = TextView(this).apply { setTextColor(Color.WHITE); text = "正在准备独立运行环境，首次启动需要解压资源…"; setPadding(16, 12, 16, 12) }
         root.addView(status)
@@ -97,7 +138,7 @@ class MainActivity : ComponentActivity() {
                 downloads.close()
                 view.destroy()
                 status.visibility = View.VISIBLE
-                status.text = "页面进程已停止（内存回收或浏览器异常）。后台服务仍独立运行。点击这里重新打开页面，可从恢复结果查看已保存回复。"
+                status.text = "页面进程已停止（内存回收或浏览器异常）。后台服务仍独立运行，已接收的生成结果会保留。点击这里重新打开页面。"
                 status.setOnClickListener { recreate() }
                 return true
             }

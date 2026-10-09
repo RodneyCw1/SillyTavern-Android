@@ -3,11 +3,21 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { unpackMigration } from '../server/android/migration.js';
 
 const project = path.resolve(import.meta.dirname, '..');
 const sourceRoot = process.env.ST_ANDROID_TEST_SOURCE_ROOT || project;
 const load = () => import(pathToFileURL(path.join(sourceRoot, 'scripts/import-ui-acceptance.mjs')));
+
+test('hidden import entry skips the legacy picker suite without selecting or resetting a device', () => {
+    const result = spawnSync(process.execPath, [path.join(sourceRoot, 'scripts/import-ui-acceptance.mjs')], { cwd: project, encoding: 'utf8', timeout: 10000 });
+    assert.equal(result.status, 0);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.skipped, true);
+    assert.equal(report.passed, false);
+    assert.deepEqual(report.checks, []);
+});
 
 test('import acceptance requires a dedicated debug emulator and explicit data reset', async () => {
     const { requireImportFixture } = await load();

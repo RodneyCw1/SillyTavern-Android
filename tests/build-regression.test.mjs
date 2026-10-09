@@ -30,6 +30,14 @@ async function fixture(t) {
     return root;
 }
 
+test('source inventory excludes local Google API key files from public archives', async t => {
+    const root = await fixture(t);
+    await fs.writeFile(path.join(root, 'Google Cloud API Key.txt'), 'synthetic private credential');
+    const { collectSourceFiles, excludedSourcePath } = await import(pathToFileURL(path.join(root, 'scripts/source-inventory.mjs')));
+    assert.equal(excludedSourcePath('Google Cloud API Key.txt'), true);
+    assert.ok(!(await collectSourceFiles(root)).includes('Google Cloud API Key.txt'));
+});
+
 function run(root, script, args = [], extra = {}) {
     return spawnSync(process.execPath, [script, ...args], {
         cwd: root, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024,

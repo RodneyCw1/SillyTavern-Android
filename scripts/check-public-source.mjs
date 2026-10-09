@@ -9,7 +9,7 @@ try{files=execFileSync('git',['ls-files','-z'],{cwd:root,encoding:'utf8',windows
 catch{files=await collectSourceFiles(root);}
 if(!files.length)files=await collectSourceFiles(root);
 for(const relative of files){
-    if(/^docs\/acceptance(?:\/|$)/.test(relative)||/\.(?:tar\.gz|tar\.xz)$/.test(relative)||forbidden.test(relative)||/^server\/android\/bundled-extensions\//.test(relative)||/^android\/app\/src\/main\/cpp\/node-include\//.test(relative))throw Error('Forbidden public file: '+relative);
+    if(/^docs\/acceptance(?:\/|$)/.test(relative)||/\.(?:tar\.gz|tar\.xz)$/.test(relative)||forbidden.test(relative)||/(?:^|\/)Google Cloud API Key\.txt$/i.test(relative)||/^server\/android\/bundled-extensions\//.test(relative)||/^android\/app\/src\/main\/cpp\/node-include\//.test(relative))throw Error('Forbidden public file: '+relative);
     const stat=await fs.stat(path.join(root,relative));if(stat.size>100*1024*1024)throw Error('Oversized Git source file: '+relative);
     if(/\.(?:json|yaml|yml|md|js|mjs|kt|ps1|txt)$/.test(relative)&&stat.size<4*1024*1024){
         const text=await fs.readFile(path.join(root,relative),'utf8');
