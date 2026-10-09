@@ -86,29 +86,25 @@ export function assertReadyUi(xml, packageName) {
     const text = nodes.map(node => [node.text, node['content-desc']].filter(Boolean).join(' ')).join('\n');
     assert.ok(!/正在准备独立运行环境|启动失败|启动时间较长|无法安全连接|端口被占用|页面进程已停止|版本过旧|正在重启/.test(text), 'Application UI is not ready');
     assert.ok(nodes.some(node => node.class === 'android.webkit.WebView'), 'Live app WebView is missing from UI');
-    const toolbarLabels = nodes.filter(node => node.class === 'android.widget.Button').map(node => node.text);
-    for (const label of ['更新', '重启', '退出']) assert.ok(toolbarLabels.includes(label), 'Native application toolbar UI is missing');
-    assert.ok(!toolbarLabels.some(label => ['导入数据', '恢复结果'].includes(label)), 'Hidden native toolbar entries are still visible');
+    assert.ok(nodes.some(node => node.class === 'android.widget.Button' && node['content-desc'] === '应用控制'), 'Native application controls are missing');
+    assert.ok(!nodes.some(node => node.class === 'android.widget.Button' && ['更新', '重启', '退出', '导入数据', '恢复结果'].includes(node.text)), 'Expanded native toolbar is still visible');
     const onboarding = /Welcome to SillyTavern!|欢迎(?:使用|来到)\s*SillyTavern/.test(text) && nodes.some(node => node.class === 'android.widget.EditText');
     const chat = nodes.some(node => /(?:^|[/:])send_textarea$/.test(node['resource-id'] || '') && node.class === 'android.widget.EditText');
     assert.ok(onboarding || chat, 'Actual SillyTavern page is not ready in UI');
     return { state: onboarding ? 'onboarding' : 'chat', visibleNodes: nodes.length };
 }
 
-export function assertToolbarLayout(xml, packageName, { density, contentLeft, contentRight } = {}) {
-    assert.ok(Number.isFinite(density) && density > 0, 'Screen density is required for toolbar measurements');
-    const labels = ['更新', '重启', '退出'];
-    const nodes = parseUiNodes(xml).filter(node => node.visible && node.package === packageName && node.class === 'android.widget.Button' && labels.includes(node.text));
-    assert.deepEqual(nodes.map(node => node.text), labels, 'Native toolbar button order or count is wrong');
-    const bounds = nodes.map(node => node.bounds.match(/\d+/g).map(Number));
-    const near = (actual, dp) => assert.ok(Math.abs(actual - dp * density) <= 1, `Toolbar dimension ${actual}px differs from ${dp}dp`);
-    const widths = bounds.map(([left, , right]) => right - left);
-    assert.ok(Math.max(...widths) - Math.min(...widths) <= 1, 'Native toolbar buttons must have equal widths');
-    bounds.forEach(([, top, , bottom]) => { near(bottom - top, 48); assert.equal(top, bounds[0][1], 'Toolbar buttons must align'); });
-    for (let i = 1; i < bounds.length; i++) near(bounds[i][0] - bounds[i - 1][2], 8);
-    if (Number.isFinite(contentLeft)) near(bounds[0][0] - contentLeft, 12);
-    if (Number.isFinite(contentRight)) near(contentRight - bounds.at(-1)[2], 12);
-    return { labels, bounds, density };
+export function assertControlsLayout(xml, packageName, { density, contentLeft, contentRight, contentTop, contentBottom } = {}) {
+    assert.ok(Number.isFinite(density) && density > 0, 'Screen density is required for controls measurements');
+    const nodes = parseUiNodes(xml).filter(node => node.visible && node.package === packageName && node.class === 'android.widget.Button' && node['content-desc'] === '应用控制');
+    assert.equal(nodes.length, 1, 'Expected one native application control');
+    const [left, top, right, bottom] = nodes[0].bounds.match(/-?\d+/g).map(Number);
+    for (const size of [right - left, bottom - top]) assert.ok(Math.abs(size - 48 * density) <= 1, 'Controls touch area must be 48dp');
+    if (Number.isFinite(contentLeft)) assert.ok(left >= contentLeft, 'Control overlaps left system inset');
+    if (Number.isFinite(contentRight)) assert.ok(right <= contentRight, 'Control overlaps right system inset');
+    if (Number.isFinite(contentTop)) assert.ok(top >= contentTop, 'Control overlaps top system inset');
+    if (Number.isFinite(contentBottom)) assert.ok(bottom <= contentBottom, 'Control overlaps keyboard or bottom system inset');
+    return { bounds: [left, top, right, bottom], density };
 }
 
 export async function waitForDebugPageReady(page, waitForReady = waitForAcceptanceReady) {

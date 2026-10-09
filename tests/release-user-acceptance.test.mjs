@@ -77,26 +77,24 @@ test('a negative CDP result needs a working positive control, live stable PID an
 test('Release readiness requires real application UI, not an empty WebView or failure status', async () => {
     const { assertReadyUi } = await load();
     const node = (text, cls = 'android.widget.TextView') => `<node package="${pkg}" class="${cls}" text="${text}" enabled="true" bounds="[0,0][300,100]"/>`;
-    const toolbar = ['更新', '重启', '退出'].map(text => node(text, 'android.widget.Button')).join('');
+    const toolbar = node('⋮', 'android.widget.Button').replace('enabled=', 'content-desc="应用控制" enabled=');
     const ready = `<hierarchy>${toolbar}${node('', 'android.webkit.WebView')}${node('Welcome to SillyTavern!')}${node('Persona Name:')}${node('User', 'android.widget.EditText')}</hierarchy>`;
     assert.equal(assertReadyUi(ready, pkg).state, 'onboarding');
-    assert.throws(() => assertReadyUi(ready.replace('</hierarchy>', node('恢复结果', 'android.widget.Button') + '</hierarchy>'), pkg), /toolbar/i);
-    assert.throws(() => assertReadyUi(ready.replace(node('更新', 'android.widget.Button'), ''), pkg), /toolbar/i);
+    assert.throws(() => assertReadyUi(ready.replace('</hierarchy>', node('恢复结果', 'android.widget.Button') + '</hierarchy>'), pkg), /toolbar|controls/i);
+    assert.throws(() => assertReadyUi(ready.replace(toolbar, ''), pkg), /toolbar|controls/i);
     for (const bad of [toolbar, ready.replace('Welcome to SillyTavern!', ''), ready.replaceAll(pkg, pkg + '.debug'), ready.replace('</hierarchy>', node('页面进程已停止（内存回收或浏览器异常）。') + '</hierarchy>'), ready.replace('</hierarchy>', node('正在准备独立运行环境，首次启动需要解压资源…') + '</hierarchy>')]) {
         assert.throws(() => assertReadyUi(bad, pkg), /UI|page|WebView|ready/i);
     }
 });
 
-test('native toolbar measurements reject wrong order, size and spacing', async () => {
-    const { assertToolbarLayout } = await load();
-    const node = (text, bounds) => `<node package="${pkg}" class="android.widget.Button" text="${text}" enabled="true" bounds="${bounds}"/>`;
-    const update = node('更新', '[12,32][108,80]');
-    const restart = node('重启', '[116,32][212,80]');
-    const exit = node('退出', '[220,32][316,80]');
-    const options = { density: 1, contentLeft: 0, contentRight: 328 };
-    assert.deepEqual(assertToolbarLayout(update + restart + exit, pkg, options).labels, ['更新', '重启', '退出']);
-    for (const bad of [restart + update + exit, update.replace('108,80', '108,76') + restart + exit, update + restart.replace('116,32', '118,32') + exit, update + restart + exit.replace('316,80', '312,80')]) {
-        assert.throws(() => assertToolbarLayout(bad, pkg, options), /toolbar|Toolbar/);
+test('native control measurements reject a small target, duplicates and keyboard overlap', async () => {
+    const { assertControlsLayout } = await load();
+    const node = bounds => '<node package="' + pkg + '" class="android.widget.Button" text="⋮" content-desc="应用控制" enabled="true" bounds="' + bounds + '"/>';
+    const control = node('[8,200][56,248]');
+    const options = { density: 1, contentLeft: 0, contentRight: 328, contentTop: 24, contentBottom: 500 };
+    assert.deepEqual(assertControlsLayout(control, pkg, options).bounds, [8, 200, 56, 248]);
+    for (const bad of [node('[8,200][40,232]'), control + control, node('[300,200][348,248]'), node('[8,480][56,528]'), node('[8,0][56,48]')]) {
+        assert.throws(() => assertControlsLayout(bad, pkg, options), /control|Control/);
     }
 });
 

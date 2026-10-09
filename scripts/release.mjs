@@ -58,7 +58,7 @@ export async function publishRelease(info,files,github){
         catch(error){if(error.status!==422)throw error;}
         const asset=release.assets.find(x=>x.name.endsWith('.apk'));
         await github.api('repos/'+repo+'/issues','POST',{title:'[发布] '+info.versionName,labels:['release'],
-            body:marker+'\n\n'+info.notes+'\n\n[下载签名 APK]('+asset.browser_download_url+') · [Release 与校验文件]('+release.html_url+')\n\n旧版首次需手动覆盖安装；后续可在应用工具栏点击“更新”。覆盖安装保留已有角色卡、世界书、聊天、设置与插件。'});
+            body:marker+'\n\n'+info.notes+'\n\n[下载签名 APK]('+asset.browser_download_url+') · [Release 与校验文件]('+release.html_url+')\n\n旧版首次需手动覆盖安装；后续可点击“⋮”应用控制菜单，再选择“更新”。覆盖安装保留已有角色卡、世界书、聊天、设置与插件。'});
     }
     return release.html_url;
 }

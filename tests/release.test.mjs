@@ -32,6 +32,7 @@ test('release rerun does not overwrite published assets or duplicate its announc
     };
     await publishRelease(info,[apk],github);await publishRelease(info,[apk],github);
     assert.equal(state.uploads,1);assert.equal(state.published,1);assert.equal(state.issues.length,1);
+    assert.match(state.issues[0].body,/点击“⋮”应用控制菜单，再选择“更新”/);
     state.release.draft=true;state.release.assets=[];
     const broken={...github,upload:async()=>{}};
     await assert.rejects(publishRelease(info,[apk],broken),/verification failed/);
