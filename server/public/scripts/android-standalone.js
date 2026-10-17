@@ -2,6 +2,10 @@
 (() => {
     'use strict';
     if (location.origin !== 'http://127.0.0.1:17614') return;
+    if (window.AndroidHost) {
+        import('./android-card-layout.js').then(module => module.installAndroidCardLayout())
+            .catch(error => console.warn('Unable to apply Android embedded card layout:', error));
+    }
     const originalFetch = window.fetch.bind(window);
     const generationPaths = new Set(['/api/backends/chat-completions/generate', '/api/backends/text-completions/generate', '/api/backends/kobold/generate', '/api/novelai/generate']);
     const active = new Map();

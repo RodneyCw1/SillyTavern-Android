@@ -1,0 +1,42 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; }
+    .content-wrapper { padding: 24px 18px; }
+    .mode-selection-container { display: flex; gap: 22px; flex-direction: column; align-items: center; }
+    .mode-card { width: min(320px, calc(100vw - 40px)); height: 230px; overflow: hidden; border: 1px solid; }
+    .inner { height: 100%; display: flex; gap: 18px; align-items: center; padding: 22px 26px; }
+    .num { font-size: 14px; letter-spacing: 4px; }
+    .art { width: 100px; height: 100px; flex-shrink: 0; }
+    .mode-name { font-size: 22px; letter-spacing: .3em; }
+    .mode-description { font-size: 13px; line-height: 1.8; }
+</style>
+<div class="content-wrapper"><div id="mode-selection">
+    <div class="mode-heading"><div class="gtitle">选择游戏模式</div></div>
+    <div class="mode-selection-container">
+        <div class="mode-card" data-mode="first"><div class="inner">
+            <div class="num">0</div><div class="art"></div>
+            <div><div class="mode-name">模式一</div><div class="mode-description">创建一个角色并开始体验游戏中的冒险与故事</div></div>
+        </div></div>
+        <div class="mode-card" data-mode="second"><div class="inner">
+            <div class="num">XXI</div><div class="art"></div>
+            <div><div class="mode-name">模式二</div><div class="mode-description">编写剧本与设定并查看故事中的人物与环境</div></div>
+        </div></div>
+    </div>
+</div></div>
+<style>
+    .drawer-panel { position: fixed; top: 0; bottom: 0; width: 200px; background: white; z-index: 2; }
+    .drawer-panel.left { left: 0; transform: translateX(-100%); }
+    .drawer-panel.right { right: 0; transform: translateX(100%); }
+    .drawer-panel.open { transform: none; }
+    .drawer-close { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; }
+    .drawer-overlay { display: none; position: fixed; inset: 0; background: #0006; z-index: 1; }
+    .drawer-overlay.active { display: block; }
+</style>
+<!-- Reproduce a card whose open handler exists but close delegation failed to initialize. -->
+<button id="open-left" onclick="document.getElementById('left-drawer').classList.add('open');document.querySelector('.drawer-overlay').classList.add('active')">Open</button>
+<div class="drawer-overlay"></div>
+<div id="left-drawer" class="drawer-panel left" onclick="event.stopPropagation()"><div class="drawer-close"><span>×</span></div></div>
+<div id="right-drawer" class="drawer-panel right"><div class="drawer-close">×</div></div>
+<div id="unrelated-modal" class="open"><button class="drawer-close">Other close button</button></div>
