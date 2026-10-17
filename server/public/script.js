@@ -218,7 +218,8 @@ import { markdownExclusionExt } from './scripts/showdown-exclusion.js';
 import { markdownUnderscoreExt } from './scripts/showdown-underscore.js';
 import { NOTE_MODULE_NAME, initAuthorsNote, metadata_keys, setFloatingPrompt, shouldWIAddPrompt } from './scripts/authors-note.js';
 import { registerPromptManagerMigration } from './scripts/PromptManager.js';
-import { getRegexedString, regex_placement } from './scripts/extensions/regex/engine.js';
+import { getRegexedString, getRegexScripts, regex_placement } from './scripts/extensions/regex/engine.js';
+import { ANDROID_CHAT_PAGE_SIZE, createAndroidChatNavigation, getAndroidChatWindow, resolveAndroidChatSelection } from './scripts/android-chat-window.js';
 import { initLogprobs, saveLogprobsForActiveMessage } from './scripts/logprobs.js';
 import { FILTER_STATES, FILTER_TYPES, FilterHelper, isFilterState } from './scripts/filters.js';
 import { getCfgPrompt, getGuidanceScale, initCfg } from './scripts/cfg-scale.js';
@@ -1431,7 +1432,56 @@ export async function replaceCurrentChat() {
     }
 }
 
+let androidChatWindow = null;
+let androidChatPaging = false;
+
+function androidMessageRange(total = chat.length, end = total) {
+    if (!window.AndroidHost || extension_settings.disabledExtensions.includes('regex')) return null;
+    return getAndroidChatWindow({ android: true, scripts: getRegexScripts({ allowedOnly: true }), total, end });
+}
+
+function updateAndroidChatSelection() {
+    if (!characters[this_chid] || !androidMessageRange(1)) return;
+    if (!lodash.isPlainObject(extension_settings.android_chat_selection)) extension_settings.android_chat_selection = {};
+    if (resolveAndroidChatSelection(characters[this_chid], extension_settings.android_chat_selection)) saveSettingsDebounced();
+}
+
+function updateAndroidChatNavigation() {
+    chatElement.children('#android_chat_navigation').remove();
+    const navigation = createAndroidChatNavigation(document, androidChatWindow);
+    if (navigation) chatElement.prepend(navigation);
+}
+
+function pruneAndroidChatMessages(range) {
+    chatElement.children('.mes').filter((_, element) => {
+        const id = Number(element.getAttribute('mesid'));
+        return id < range.start || id >= range.end;
+    }).remove();
+}
+
+async function showAndroidChatPage(action) {
+    if (!androidChatWindow || androidChatPaging) return;
+    androidChatPaging = true;
+    try {
+        const end = action === 'older' ? androidChatWindow.start
+            : action === 'newer' ? androidChatWindow.end + ANDROID_CHAT_PAGE_SIZE : chat.length;
+        chatElement.children().remove();
+        // Let iframe owners release the old document before expanding the next template.
+        await eventSource.emit(event_types.CHAT_LOADED, { detail: { id: this_chid, character: characters[this_chid] } });
+        await redisplayChat({ endIndex: end, fade: false });
+        // Release helper-owned runtimes too, including when paging backwards.
+        await eventSource.emit(event_types.CHAT_LOADED, { detail: { id: this_chid, character: characters[this_chid] } });
+        chatElement.scrollTop(0);
+    } finally {
+        androidChatPaging = false;
+    }
+}
+
 export async function showMoreMessages(messagesToLoad = null) {
+    if (androidChatWindow && androidMessageRange()) {
+        await showAndroidChatPage('older');
+        return;
+    }
     const firstDisplayedMesId = chatElement.children('.mes').first().attr('mesid');
     let messageId = Number(firstDisplayedMesId);
     let count = messagesToLoad || power_user.chat_truncation || Number.MAX_SAFE_INTEGER;
@@ -1479,9 +1529,12 @@ export async function printMessages() {
     let startIndex = 0;
     let count = power_user.chat_truncation || Number.MAX_SAFE_INTEGER;
 
+    const androidRange = androidMessageRange();
+    if (androidRange) count = ANDROID_CHAT_PAGE_SIZE;
+
     if (chat.length > count) {
         startIndex = chat.length - count;
-        chatElement.append('<div id="show_more_messages">Show more messages</div>');
+        if (!androidRange) chatElement.append('<div id="show_more_messages">Show more messages</div>');
     }
 
     await redisplayChat({ startIndex, fade: false });
@@ -1495,18 +1548,26 @@ export async function printMessages() {
  * @param {object} [options] Options
  * @param {ChatMessage[]} [options.targetChat=chat] All messages in chat before startIndex will remain unchanged.
  * @param {Number} [options.startIndex=0] Everything including and after startIndex will be replaced.
+ * @param {Number} [options.endIndex=targetChat.length] Exclusive end of the displayed message range.
  * @param {Boolean} [options.fade=true] When false, the swipe chevrons will not fade in.
  */
-export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = true } = {}) {
+export async function redisplayChat({ targetChat = chat, startIndex = 0, endIndex = targetChat.length, fade = true } = {}) {
+    androidChatWindow = androidMessageRange(targetChat.length, endIndex);
+    if (androidChatWindow) {
+        startIndex = Math.max(startIndex, androidChatWindow.start);
+        endIndex = androidChatWindow.end;
+        pruneAndroidChatMessages(androidChatWindow);
+        chatElement.children('#show_more_messages').remove();
+    }
     const messageElements = chatElement.find('.mes');
     messageElements.removeClass('last_mes');
 
     //Remove messages after index.
-    messageElements.filter(`.mes[mesid="${startIndex}"]`).nextAll('.mes').addBack().remove();
+    messageElements.filter((_, element) => Number(element.getAttribute('mesid')) >= startIndex).remove();
 
     const t1 = performance.now();
 
-    const messages = targetChat.slice(startIndex);
+    const messages = targetChat.slice(startIndex, endIndex);
 
     if (messages.length > 0) {
         const newMessageElements = messages.map((message, offset) => {
@@ -1517,19 +1578,20 @@ export async function redisplayChat({ targetChat = chat, startIndex = 0, fade = 
         });
 
         //The last_mes has been removed, add it to the new last message.
-        newMessageElements.at(-1).classList.add('last_mes');
+        if (endIndex === targetChat.length) newMessageElements.at(-1).classList.add('last_mes');
 
         //Append to chat in one DOM update.
         chatElement.append(newMessageElements);
 
-        applyCharacterTagsToMessageDivs({ mesIds: lodash.range(startIndex, targetChat.length, 1) });
+        applyCharacterTagsToMessageDivs({ mesIds: lodash.range(startIndex, endIndex, 1) });
     }
 
     refreshSwipeButtons(false, fade);
     applyStylePins();
     updateEditArrowClasses();
+    updateAndroidChatNavigation();
 
-    console.info(`Rendered ${targetChat.length - startIndex} messages in ${((performance.now() - t1) / 1000).toFixed(3)} seconds.`);
+    console.info(`Rendered ${messages.length} messages in ${((performance.now() - t1) / 1000).toFixed(3)} seconds.`);
 }
 
 export function scrollOnMediaLoad() {
@@ -1585,6 +1647,8 @@ export function cancelDebouncedChatSave() {
  * @param {boolean} [options.clearData=false] Optionally clear the chat array's contents.
  */
 export async function clearChat({ clearData = false } = {}) {
+    const hadAndroidWindow = androidChatWindow !== null;
+    androidChatWindow = null;
     cancelDebouncedChatSave();
     cancelDebouncedMetadataSave();
     closeMessageEditor();
@@ -1594,6 +1658,9 @@ export async function clearChat({ clearData = false } = {}) {
     }
     //This will also remove non '.mes' elements, e.g. '<div id="show_more_messages">Show more messages</div>'.
     chatElement.children().remove();
+    if (hadAndroidWindow && characters[this_chid]) {
+        await eventSource.emit(event_types.CHAT_LOADED, { detail: { id: this_chid, character: characters[this_chid] } });
+    }
     if ($('.zoomed_avatar[forChar]').length) {
         console.debug('saw avatars to remove');
         $('.zoomed_avatar[forChar]').remove();
@@ -2565,6 +2632,22 @@ export function addOneMessage(mes, { type = undefined, insertAfter = null, scrol
         }
         return chat.length - 1;
     })();
+
+    const targetEnd = messageId === chat.length - 1 ? chat.length
+        : androidChatWindow && messageId >= androidChatWindow.start && messageId < androidChatWindow.end
+            ? androidChatWindow.end : messageId + 1;
+    const androidRange = androidMessageRange(chat.length, targetEnd);
+    if (androidRange) {
+        androidChatWindow = androidRange;
+        pruneAndroidChatMessages(androidRange);
+        // A new reply while viewing history returns to the current conversation.
+        for (let id = androidRange.start; id < messageId; id++) {
+            if (!chatElement.children(`.mes[mesid="${id}"]`).length) {
+                chatElement.append(updateMessageElement(chat[id], { messageId: id }));
+            }
+        }
+        updateAndroidChatNavigation();
+    }
 
     let messageElement;
 
@@ -7651,6 +7734,7 @@ export async function unshallowCharacter(characterId) {
 }
 
 export async function getChat() {
+    updateAndroidChatSelection();
     try {
         await unshallowCharacter(this_chid);
 
@@ -7762,12 +7846,16 @@ function getFirstMessage() {
 
 export async function openCharacterChat(file_name) {
     await waitUntilCondition(() => !isChatSaving, debounce_timeout.extended, 10);
+    const lightweightSwitch = Boolean(androidMessageRange(Math.max(1, chat.length)));
+    if (lightweightSwitch) updateAndroidChatSelection();
     await clearChat({ clearData: true });
     characters[this_chid].chat = file_name;
     chat_metadata = {};
     await getChat();
     $('#selected_chat_pole').val(file_name);
-    await createOrEditCharacter(new CustomEvent('newChat'));
+    if (!lightweightSwitch) {
+        await createOrEditCharacter(new CustomEvent('newChat'));
+    }
 }
 
 ////////// OPTIMZED MAIN API CHANGE FUNCTION ////////////
@@ -12599,6 +12687,11 @@ jQuery(async function () {
         event.stopPropagation();
         event.preventDefault();
         await showMoreMessages();
+    });
+
+    $(document).on('click', '[data-android-chat-page]', async function (event) {
+        event.preventDefault();
+        await showAndroidChatPage(this.dataset.androidChatPage);
     });
 
     $(document).on('click', '.open_characters_library', async function () {

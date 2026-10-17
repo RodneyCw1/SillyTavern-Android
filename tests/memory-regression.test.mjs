@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import vm from 'node:vm';
 import { LimitedCache } from '../server/public/scripts/limited-cache.js';
 import { getMessageDepth } from '../server/public/scripts/message-depth.js';
+import { resolveAndroidTokenCountText } from '../server/public/scripts/android-chat-window.js';
 
 test('cache releases old entries and retains recently used values, including zero', () => {
     const cache = new LimitedCache(3);
@@ -88,7 +89,7 @@ async function tokenHarness(initial = {}, filename = new URL('../server/public/s
     });
     const modules = {
         '../lib.js': { localforage: { createInstance: () => store } },
-        '../script.js': { eventSource: { on() {} }, event_types: { ONLINE_STATUS_CHANGED: 'online' }, characters: [character], main_api: 'kobold', nai_settings: {}, online_status: 'no_connection', this_chid: 0 },
+        '../script.js': { chat: [], eventSource: { on() {} }, event_types: { ONLINE_STATUS_CHANGED: 'online' }, characters: [character], main_api: 'kobold', nai_settings: {}, online_status: 'no_connection', this_chid: 0 },
         './power-user.js': { power_user: settings, registerDebugFunction: (_id, _name, _description, action) => { reset = action; } },
         './openai.js': { chat_completion_sources: { OPENAI: 'openai' }, model_list: [], oai_settings: { chat_completion_source: 'openai', openai_model: 'gpt-test' } },
         './group-chats.js': { groups: [group], selected_group: null },
@@ -97,6 +98,8 @@ async function tokenHarness(initial = {}, filename = new URL('../server/public/s
         './textgen-settings.js': { textgen_types: {}, textgenerationwebui_settings: {}, getTextGenServer: () => '', getTextGenModel: () => '' },
         './textgen-models.js': { getCurrentDreamGenModelTokenizer() {}, getCurrentOpenRouterModelTokenizer() {}, openRouterModels: [] },
         './limited-cache.js': { LimitedCache },
+        './android-chat-window.js': { resolveAndroidTokenCountText },
+        './extensions/regex/engine.js': { getRegexScripts: () => [], RegexProvider: { instance: { get: pattern => new RegExp(pattern) } } },
     };
     const linked = {};
     const module = new vm.SourceTextModule(await fs.readFile(filename, 'utf8'), { context });

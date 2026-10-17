@@ -1,6 +1,8 @@
 import { localforage } from '../lib.js';
 import { LimitedCache } from './limited-cache.js';
-import { characters, event_types, eventSource, main_api, nai_settings, online_status, this_chid } from '../script.js';
+import { resolveAndroidTokenCountText } from './android-chat-window.js';
+import { getRegexScripts, RegexProvider } from './extensions/regex/engine.js';
+import { chat, characters, event_types, eventSource, main_api, nai_settings, online_status, this_chid } from '../script.js';
 import { power_user, registerDebugFunction } from './power-user.js';
 import { chat_completion_sources, model_list, oai_settings } from './openai.js';
 import { groups, selected_group } from './group-chats.js';
@@ -454,7 +456,14 @@ function callTokenizerAsync(type, str) {
  * @param {number | undefined} padding Optional padding tokens. Defaults to 0.
  * @returns {Promise<number>} Token count.
  */
+function androidTokenCountInput(str) {
+    if (typeof window === 'undefined' || !window.AndroidHost || typeof str !== 'string' || str.length < 256 * 1024) return str;
+    return resolveAndroidTokenCountText(str, { android: true, document: window.document, messages: chat,
+        templates: getRegexScripts({ allowedOnly: true }), matches: (template, raw) => !!RegexProvider.instance.get(template.findRegex)?.test(raw) });
+}
+
 export async function getTokenCountAsync(str, padding = undefined) {
+    str = androidTokenCountInput(str);
     if (typeof str !== 'string' || !str?.length) {
         return 0;
     }
@@ -511,6 +520,7 @@ export async function getTokenCountAsync(str, padding = undefined) {
  * @deprecated Use getTokenCountAsync instead.
  */
 export function getTokenCount(str, padding = undefined) {
+    str = androidTokenCountInput(str);
     if (typeof str !== 'string' || !str?.length) {
         return 0;
     }
