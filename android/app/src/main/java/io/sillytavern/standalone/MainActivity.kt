@@ -87,13 +87,15 @@ class MainActivity : ComponentActivity() {
         CookieManager.getInstance().setAcceptCookie(true)
         web.webViewClient = object : WebViewClient() {
             override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                val reason = if (detail.didCrash()) "浏览器渲染异常" else "系统内存回收"
+                android.util.Log.w("ST-WebView", "Renderer stopped: crashed=${detail.didCrash()}, priority=${detail.rendererPriorityAtExit()}")
                 rendererGone = true; loaded = true
                 (view.parent as? android.view.ViewGroup)?.removeView(view)
                 choosing = null
                 downloads.close()
                 view.destroy()
                 status.visibility = View.VISIBLE
-                status.text = "页面进程已停止（内存回收或浏览器异常）。后台服务仍独立运行，已接收的生成结果会保留。点击这里重新打开页面。"
+                status.text = "页面进程已停止（$reason）。后台服务仍独立运行，已接收的生成结果会保留。点击这里重新打开页面。"
                 status.setOnClickListener { recreate() }
                 return true
             }

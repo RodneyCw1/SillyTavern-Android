@@ -220,6 +220,7 @@ import { NOTE_MODULE_NAME, initAuthorsNote, metadata_keys, setFloatingPrompt, sh
 import { registerPromptManagerMigration } from './scripts/PromptManager.js';
 import { getRegexedString, getRegexScripts, regex_placement } from './scripts/extensions/regex/engine.js';
 import { ANDROID_CHAT_PAGE_SIZE, createAndroidChatNavigation, getAndroidChatWindow, resolveAndroidChatSelection } from './scripts/android-chat-window.js';
+import { protectAndroidHtmlBlocks } from './scripts/android-html-blocks.js';
 import { initLogprobs, saveLogprobsForActiveMessage } from './scripts/logprobs.js';
 import { FILTER_STATES, FILTER_TYPES, FilterHelper, isFilterState } from './scripts/filters.js';
 import { getCfgPrompt, getGuidanceScale, initCfg } from './scripts/cfg-scale.js';
@@ -1934,6 +1935,9 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
         );
     }
 
+    const htmlBlocks = protectAndroidHtmlBlocks(mes, { android: !!window.AndroidHost && !isSystem, render: true });
+    mes = htmlBlocks.text;
+
     if (power_user.auto_fix_generated_markdown) {
         mes = fixMarkdown(mes, true);
     }
@@ -2011,6 +2015,7 @@ export function messageFormatting(mes, ch_name, isSystem, isUser, messageId, san
             return match.replace(/&amp;/g, '&');
         });
 
+        mes = htmlBlocks.restore(mes);
         mes = MessageFormatter.runStage(MessageFormatter.stage.AFTER_MARKDOWN, mes,
             { ch_name, isSystem, isUser, messageId, isReasoning },
         );

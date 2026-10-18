@@ -3,6 +3,7 @@ import { extension_settings, writeExtensionField } from '../../extensions.js';
 import { getPresetManager } from '../../preset-manager.js';
 import { regexFromString } from '../../utils.js';
 import { lodash } from '../../../lib.js';
+import { protectAndroidHtmlBlocks } from '../../android-html-blocks.js';
 
 /**
  * @readonly
@@ -344,6 +345,7 @@ export function getRegexedString(rawString, placement, { characterOverride, isMa
     }
 
     const allRegex = getRegexScripts({ allowedOnly: true });
+    const htmlBlocks = [];
     allRegex.forEach((script) => {
         if (
             // Script applies to Markdown and input is Markdown
@@ -373,10 +375,15 @@ export function getRegexedString(rawString, placement, { characterOverride, isMa
 
             if (script.placement.includes(placement)) {
                 finalString = runRegexScript(script, finalString, { characterOverride });
+                // Later hiding rules must not match tag examples inside an embedded UI's JavaScript.
+                const protectedHtml = protectAndroidHtmlBlocks(finalString, { android: !!globalThis.window?.AndroidHost && isMarkdown });
+                finalString = protectedHtml.text;
+                htmlBlocks.push(protectedHtml.restore);
             }
         }
     });
 
+    for (const restore of htmlBlocks.reverse()) finalString = restore(finalString);
     return finalString;
 }
 
