@@ -100,9 +100,9 @@ async function main(){
     for await(const chunk of createReadStream(apk)){hash.update(chunk);size+=chunk.length;}
     const sha256=hash.digest('hex');
     const audit=JSON.parse(await fs.readFile(path.join(root,'releases/apk-audit.json'),'utf8'));
-    if(!audit.passed||audit.appVersion!==versionName||audit.plugins.length)throw Error('APK audit failed or third-party preinstallation found');
+    if(!audit.passed||audit.appVersion!==versionName||!audit.sillyTavern||audit.plugins.length)throw Error('APK audit failed or third-party preinstallation found');
     const subject=execFileSync('git',['show','-s','--format=%s',commit],{cwd:root,encoding:'utf8',windowsHide:true}).trim();
-    const notes='SillyTavern '+versionName+'\n\n'+subject+'\n\n原生 SillyTavern 1.19.0；不预装第三方插件、角色卡或世界书。更新保留已有个人内容。';
+    const notes = `SillyTavern ${versionName}\n\n${subject}\n\n内置 SillyTavern ${audit.sillyTavern}。第三方插件、角色卡和世界书由用户自行添加，覆盖安装可保留已有个人内容。`;
     const info={schemaVersion:1,versionName,versionCode,packageName:releaseConfig.packageName,minSdk:releaseConfig.minSdk,
         apkUrl:'https://github.com/'+releaseConfig.repository+'/releases/download/'+encodeURIComponent('v'+versionName)+'/'+encodeURIComponent(path.basename(apk)),
         size,sha256,signingSha256:releaseConfig.signingSha256,commit,sourceHash:audit.sourceHash,notes};

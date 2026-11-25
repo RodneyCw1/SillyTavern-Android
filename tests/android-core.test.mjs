@@ -89,10 +89,13 @@ test('directory replacement restores original if staging is missing', async t =>
 });
 test('extension validation preserves compatibility boundary', async t => {
     const dir = await temporary(t);
-    await fsp.writeFile(path.join(dir, 'manifest.json'), JSON.stringify({ display_name: 'test', version: '1.0', minimum_client_version: '1.19.1', js: 'index.js' }));
+    const current = require('./package.json').version;
+    const [major, minor, patch] = current.split('.').map(Number);
+    const nextPatch = `${major}.${minor}.${patch + 1}`;
+    await fsp.writeFile(path.join(dir, 'manifest.json'), JSON.stringify({ display_name: 'test', version: '1.0', minimum_client_version: nextPatch, js: 'index.js' }));
     await fsp.writeFile(path.join(dir, 'index.js'), '');
     await assert.rejects(validateExtension(dir), /newer SillyTavern/);
-    for (const minimum of ['1.14.0', '1.15.0', '1.19.0']) {
+    for (const minimum of ['1.14.0', '1.15.0', '1.19.0', current]) {
         await fsp.writeFile(path.join(dir, 'manifest.json'), JSON.stringify({ display_name: 'test', version: '1.0', minimum_client_version: minimum, js: 'index.js' }));
         assert.equal((await validateExtension(dir)).minimum_client_version, minimum);
     }

@@ -71,6 +71,7 @@ test('audits a real nested ZIP stream, metadata, actual Multer manifest and both
     const f = await fixture(t);
     const result = await auditApkAssets(f.apk, { root, ...f });
     assert.equal(result.passed, true);
+    assert.equal(result.sillyTavern, f.expected.sillyTavern);
     assert.equal(result.multerVersion, '2.3.0');
     assert.equal(result.nativeLibraries.length, 4);
     assert.ok(result.nativeLibraries.every(library => library.loadAlignments.every(value => value >= 0x4000)));

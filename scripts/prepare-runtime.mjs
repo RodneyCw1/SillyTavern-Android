@@ -10,6 +10,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const { versionName: appVersion, versionCode } = releaseVersion();
 const server = path.join(root, 'server');
 const require = createRequire(path.join(server, 'package.json'));
+const { version: sillyTavern } = require('./package.json');
 const archiver = require('archiver');
 const webpack = require('webpack');
 const sourceHash = await getSourceHash(root);
@@ -65,7 +66,7 @@ try {
 await fsp.rename(pendingZip, zip);
 const hash = crypto.createHash('sha256');
 for await (const chunk of fs.createReadStream(zip)) hash.update(chunk);
-const metadata = { formatVersion: 1, appVersion, versionCode, sillyTavern: '1.19.0', runtimeSha256: hash.digest('hex'), sourceHash, plugins };
+const metadata = { formatVersion: 1, appVersion, versionCode, sillyTavern, runtimeSha256: hash.digest('hex'), sourceHash, plugins };
 await fsp.writeFile(path.join(assetDir, 'runtime.json'), JSON.stringify(metadata, null, 2));
 await fsp.writeFile(path.join(root, 'docs/runtime-version.json'), JSON.stringify(metadata, null, 2));
 console.log(JSON.stringify({ bytes: (await fsp.stat(zip)).size, ...metadata }, null, 2));

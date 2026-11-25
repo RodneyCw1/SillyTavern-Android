@@ -218,7 +218,7 @@ export async function auditApkAssets(apkPath, options = {}) {
         }
         return {
             passed: true, testedAt: new Date().toISOString(), appVersion, sourceHash,
-            metadataSha256, runtimeSha256: runtime.sha256, runtimeBytes: runtime.bytes, runtimeEntries,
+            sillyTavern: serverPackage.version, metadataSha256, runtimeSha256: runtime.sha256, runtimeBytes: runtime.bytes, runtimeEntries,
             multerVersion: multer.version, plugins: metadata.plugins, nativeLibraries, streamStats,
             nativeAlignmentTool: 'llvm-readelf --program-headers --wide',
         };

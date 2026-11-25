@@ -1,6 +1,6 @@
 # SillyTavern Android 独立版
 
-原生 SillyTavern 1.19.0 + Kotlin WebView + 嵌入式 Node.js 22.23.2。Android 10 / API 29 起，支持 ARM64 和 x86_64、16 KB 内存页。上游来源见 docs/upstream-1.19.0.json，保留 GNU AGPL-3.0 许可证及依赖自身许可证。
+原生 SillyTavern 1.19.1 + Kotlin WebView + 嵌入式 Node.js 22.23.2。Android 10 / API 29 起，支持 ARM64 和 x86_64、16 KB 内存页。上游来源见 docs/upstream-1.19.1.json，保留 GNU AGPL-3.0 许可证及依赖自身许可证。
 
 本项目不预装第三方插件、生图脚本、角色卡或世界书，包括官方示例角色。原生主题、预设、角色导入、世界书和扩展功能仍可使用。LocalDream 同源代理等 Android 兼容代码仍保留，第三方脚本由用户自行安装。
 

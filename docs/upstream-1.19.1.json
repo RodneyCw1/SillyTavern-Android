@@ -1,0 +1,17 @@
+{
+  "version": "1.19.1",
+  "commit": "82b64a45c34facbc98ff4b9f33c067d3ccab6a17",
+  "baseCommit": "7e8663cd9c184a550b37238218bdd32c6efc68e9",
+  "previousAndroidCommit": "f85a224aea7c08d0b51817bcfda5d2c413df4135",
+  "release": "https://github.com/SillyTavern/SillyTavern/releases/tag/1.19.1",
+  "merged": [
+    "package-lock.json",
+    "package.json",
+    "public/scripts/chats.js",
+    "src/charx.js",
+    "src/endpoints/characters.js",
+    "src/endpoints/users-admin.js",
+    "src/endpoints/users-private.js"
+  ],
+  "conflicts": []
+}
